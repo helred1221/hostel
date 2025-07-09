@@ -2,25 +2,35 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getTokenFromRequest, verifyToken } from '@/lib/auth';
 
-// GET - Listar todas as reservas
-export async function GET(request: NextRequest) {
+// GET - Buscar reserva por ID
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
     const token = getTokenFromRequest(request);
     if (!token || !verifyToken(token)) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const reservas = await prisma.reserva.findMany({
+    const reserva = await prisma.reserva.findUnique({
+      where: { id: params.id },
       include: {
         cliente: true,
         quarto: true,
       },
-      orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json(reservas);
+    if (!reserva) {
+      return NextResponse.json(
+        { error: 'Reserva não encontrada' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(reserva);
   } catch (error) {
-    console.error('Erro ao buscar reservas:', error);
+    console.error('Erro ao buscar reserva:', error);
     return NextResponse.json(
       { error: 'Erro interno do servidor' },
       { status: 500 }
@@ -28,15 +38,18 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Criar nova reserva
-export async function POST(request: NextRequest) {
+// PUT - Atualizar reserva
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
     const token = getTokenFromRequest(request);
     if (!token || !verifyToken(token)) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const { clienteId, quartoId, dataCheckIn, dataCheckOut, observacoes } = await request.json();
+    const { clienteId, quartoId, dataCheckIn, dataCheckOut, status, observacoes } = await request.json();
 
     if (!clienteId || !quartoId || !dataCheckIn || !dataCheckOut) {
       return NextResponse.json(
@@ -55,9 +68,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar se o quarto está disponível no período
+    // Verificar se o quarto está disponível no período (excluindo a reserva atual)
     const conflictingReservations = await prisma.reserva.findMany({
       where: {
+        id: { not: params.id },
         quartoId,
         status: {
           in: ['PENDENTE', 'CONFIRMADA', 'CHECKIN']
@@ -92,7 +106,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Buscar informações do quarto para calcular valor total
+    // Buscar informações do quarto para recalcular valor total
     const quarto = await prisma.quarto.findUnique({
       where: { id: quartoId }
     });
@@ -109,15 +123,16 @@ export async function POST(request: NextRequest) {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     const valorTotal = Number(quarto.preco) * diffDays;
 
-    const reserva = await prisma.reserva.create({
+    const reserva = await prisma.reserva.update({
+      where: { id: params.id },
       data: {
         clienteId,
         quartoId,
         dataCheckIn: checkIn,
         dataCheckOut: checkOut,
         valorTotal,
+        status: status || 'PENDENTE',
         observacoes,
-        status: 'PENDENTE',
       },
       include: {
         cliente: true,
@@ -125,9 +140,53 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(reserva, { status: 201 });
+    return NextResponse.json(reserva);
   } catch (error) {
-    console.error('Erro ao criar reserva:', error);
+    console.error('Erro ao atualizar reserva:', error);
+    return NextResponse.json(
+      { error: 'Erro interno do servidor' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE - Excluir reserva
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const token = getTokenFromRequest(request);
+    if (!token || !verifyToken(token)) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+
+    // Verificar se a reserva pode ser excluída (não pode estar em check-in)
+    const reserva = await prisma.reserva.findUnique({
+      where: { id: params.id }
+    });
+
+    if (!reserva) {
+      return NextResponse.json(
+        { error: 'Reserva não encontrada' },
+        { status: 404 }
+      );
+    }
+
+    if (reserva.status === 'CHECKIN') {
+      return NextResponse.json(
+        { error: 'Não é possível excluir reserva com hóspede em check-in' },
+        { status: 400 }
+      );
+    }
+
+    await prisma.reserva.delete({
+      where: { id: params.id },
+    });
+
+    return NextResponse.json({ message: 'Reserva excluída com sucesso' });
+  } catch (error) {
+    console.error('Erro ao excluir reserva:', error);
     return NextResponse.json(
       { error: 'Erro interno do servidor' },
       { status: 500 }
