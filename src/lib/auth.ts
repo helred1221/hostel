@@ -1,57 +1,39 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { verifyPassword, generateToken } from '@/lib/auth';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import { AuthUser } from '@/types';
 
-export async function POST(request: NextRequest) {
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key';
+
+export async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 10);
+}
+
+export async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
+  return bcrypt.compare(password, hashedPassword);
+}
+
+export function generateToken(user: AuthUser): string {
+  return jwt.sign(
+    { id: user.id, username: user.username },
+    JWT_SECRET,
+    { expiresIn: '24h' }
+  );
+}
+
+export function verifyToken(token: string): AuthUser | null {
   try {
-    const { username, password } = await request.json();
-
-    if (!username || !password) {
-      return NextResponse.json(
-        { error: 'Username e password são obrigatórios' },
-        { status: 400 }
-      );
-    }
-
-    // Buscar usuário no banco de dados
-    const user = await prisma.user.findUnique({
-      where: { username },
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Credenciais inválidas' },
-        { status: 401 }
-      );
-    }
-
-    // Verificar senha
-    const isValidPassword = await verifyPassword(password, user.password);
-    if (!isValidPassword) {
-      return NextResponse.json(
-        { error: 'Credenciais inválidas' },
-        { status: 401 }
-      );
-    }
-
-    // Gerar token JWT
-    const token = generateToken({
-      id: user.id,
-      username: user.username,
-    });
-
-    return NextResponse.json({
-      token,
-      user: {
-        id: user.id,
-        username: user.username,
-      },
-    });
+    const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;
+    return decoded;
   } catch (error) {
-    console.error('Erro no login:', error);
-    return NextResponse.json(
-      { error: 'Erro interno do servidor' },
-      { status: 500 }
-    );
+    console.log('Token verification error:', error);
+    return null;
   }
+}
+
+export function getTokenFromRequest(request: Request): string | null {
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+  return authHeader.substring(7);
 }
