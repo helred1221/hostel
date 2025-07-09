@@ -15,35 +15,74 @@ datasource db {
 }
 
 model User {
-  id    Int     @id @default(autoincrement())
-  email String  @unique
-  name  String
-  password String
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
 }
 
 model Cliente {
-  id Int @id @default(autoincrement())
-  email String @unique
-  name String
-  birthDate String
-  cpf String @unique
-  reserva Reserva[]
-  }
+  id        String   @id @default(cuid())
+  nome      String
+  email     String   @unique
+  telefone  String
+  documento String   @unique
+  endereco  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  reservas  Reserva[]
+
+  @@map("clientes")
+}
 
 model Quarto {
-  id Int @id @default(autoincrement())
-  type String
-  number Int
-  reservado Reserva[]
+  id        String   @id @default(cuid())
+  numero    String   @unique
+  tipo      TipoQuarto
+  preco     Float
+  descricao String?
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  reservas  Reserva[]
+
+  @@map("quartos")
 }
 
 model Reserva {
-  id Int @id @default(autoincrement())
-  dataReserva DateTime @default(now())
-  cliente Cliente @relation(fields: [clienteId], references: [id])
-  clienteId Int
-  quarto Quarto @relation(fields: [quartoId], references: [id])
-  quartoId Int
+  id           String        @id @default(cuid())
+  clienteId    String
+  quartoId     String
+  dataCheckIn  DateTime
+  dataCheckOut DateTime
+  status       StatusReserva @default(PENDENTE)
+  valorTotal   Float
+  observacoes  String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  
+  cliente      Cliente       @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  quarto       Quarto        @relation(fields: [quartoId], references: [id], onDelete: Cascade)
 
-  @@index([clienteId, quartoId])
+  @@map("reservas")
+}
+
+enum TipoQuarto {
+  SOLTEIRO
+  DUPLO
+  SUITE
+  FAMILIA
+}
+
+enum StatusReserva {
+  PENDENTE
+  CONFIRMADA
+  CHECKIN
+  CHECKOUT
+  CANCELADA
 }
