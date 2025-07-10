@@ -6,7 +6,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../app/generated/prisma"
 }
 
 datasource db {
@@ -16,8 +15,10 @@ datasource db {
 
 model User {
   id        String   @id @default(cuid())
-  username  String   @unique
+  name      String
+  email    String   @unique
   password  String
+  role      Role     @default(USER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -70,6 +71,11 @@ model Reserva {
   quarto       Quarto        @relation(fields: [quartoId], references: [id], onDelete: Cascade)
 
   @@map("reservas")
+}
+
+enum Role {
+  USER
+  ADMIN
 }
 
 enum TipoQuarto {
