@@ -4,18 +4,18 @@ import { verifyPassword, generateToken } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
-    const { username, password } = await request.json();
+    const { email, password } = await request.json();
 
-    if (!username || !password) {
+    if (!email || !password) {
       return NextResponse.json(
-        { error: 'Username e password são obrigatórios' },
+        { error: 'Email e senha são obrigatórios' },
         { status: 400 }
       );
     }
 
-    // Buscar usuário no banco de dados
+    // Buscar usuário no banco de dados pelo email
     const user = await prisma.user.findUnique({
-      where: { username },
+      where: { email: email.toLowerCase().trim() },
     });
 
     if (!user) {
@@ -37,14 +37,18 @@ export async function POST(request: NextRequest) {
     // Gerar token JWT
     const token = generateToken({
       id: user.id,
-      username: user.username,
+      email: user.email,
+      name: user.name,
+      role: user.role,
     });
 
     return NextResponse.json({
       token,
       user: {
         id: user.id,
-        username: user.username,
+        email: user.email,
+        name: user.name,
+        role: user.role,
       },
     });
   } catch (error) {
@@ -55,4 +59,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

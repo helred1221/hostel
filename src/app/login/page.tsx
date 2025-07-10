@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -38,12 +39,12 @@ export default function LoginPage() {
         <Card title="Sistema de Reservas - Hotel">
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
-              label="Usuário"
+              label="E-mail"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
-              placeholder="Digite seu usuário"
+              placeholder="Digite seu e-mail"
             />
             
             <Input
@@ -71,6 +72,15 @@ export default function LoginPage() {
           <div className="mt-6 text-sm text-gray-600 text-center">
             <p>Usuário padrão: <strong>admin</strong></p>
             <p>Senha padrão: <strong>admin123</strong></p>
+          </div>
+
+          <div className="mt-6 text-center border-t pt-4">
+            <p className="text-sm text-gray-600">
+              Não tem uma conta?{' '}
+              <Link href="/register" className="font-medium text-blue-600 hover:text-blue-500 underline">
+                Registre-se aqui
+              </Link>
+            </p>
           </div>
         </Card>
       </div>
